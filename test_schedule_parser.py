@@ -25,6 +25,7 @@ IN THE SOFTWARE.
 """
 
 import unittest
+import mock
 from schedule_parser import *
 from pentabarf.Conference import Conference
 from pentabarf.Day import Day
@@ -37,6 +38,24 @@ class TestScheduleParser(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         """Set up test fixture."""
+        cls.test_event1 = Event(
+            id=345,
+            title='test_event1',
+            description='description',
+            duration=1800,
+            date=datetime(2018, 3, 16),
+            start="01:23:45"
+        )
+
+        cls.test_event2 = Event(
+            id=456,
+            title='test_event2',
+            description='description',
+            duration=1800,
+            date=datetime(2018, 3, 20),
+            start="12:34:56"
+        )
+
 
     def setUp(self):
         """Initialise test environment before each test."""
@@ -110,11 +129,6 @@ class TestScheduleParser(unittest.TestCase):
             "test/invalid_data_invalid_parameters.json",
             "test/valid_schema.json"
         )
-
-    def test_read_json_valid(self):
-        """Test read_json function with valid input """
-        # function returns a Conference instance if json is valid
-        conference = read_json("test/valid_data.json", "test/valid_schema.json")
 
     def test_read_json_valid(self):
         """Test read_json function with valid input """
@@ -257,6 +271,90 @@ class TestScheduleParser(unittest.TestCase):
         self.assertTrue(isinstance(thirdday.date, datetime))
         self.assertEqual("2018-04-15", thirdday.date.strftime("%Y-%m-%d"))
         self.assertEqual(0, len(thirdday.room_objects))
+
+    def test_add_event2conference_invalid_parameters(self):
+        """ Test add_event2conference """
+        self.assertRaises(TypeError, add_event2conference)
+        self.assertRaises(TypeError, add_event2conference, "string")
+        self.assertRaises(TypeError, add_event2conference, 123)
+        self.assertRaises(TypeError, add_event2conference, {})
+
+        conference = Conference()
+        self.assertRaises(TypeError, add_event2conference, conference)
+
+        self.assertRaises(TypeError, add_event2conference, conference, "string")
+        self.assertRaises(TypeError, add_event2conference, conference, 123)
+        self.assertRaises(TypeError, add_event2conference, conference, {})
+
+        event = Event()
+        self.assertRaises(TypeError, add_event2conference, conference, event)
+
+        self.assertRaises(TypeError, add_event2conference, conference, event, "string")
+        self.assertRaises(TypeError, add_event2conference, conference, event, 123)
+        self.assertRaises(TypeError, add_event2conference, conference, event, {})
+
+    @mock.patch('schedule_parser.add_event2day')
+    def test_add_event2conference_nodays(self, mock_add_event2day):
+        """ Test add_event2conference """
+        conference = Conference()
+        event = Event()
+        self.assertEquals(0, mock_add_event2day.call_count)
+        add_event2conference(conference, event, [])
+        self.assertEquals(0, mock_add_event2day.call_count)
+
+        add_event2conference(conference, self.test_event1, [])
+        self.assertEquals(0, mock_add_event2day.call_count)
+
+        add_event2conference(conference, self.test_event2, [])
+        self.assertEquals(0, mock_add_event2day.call_count)
+
+    @mock.patch('schedule_parser.add_event2day')
+    def test_add_event2conference_1day(self, mock_add_event2day):
+        """ Test add_event2conference """
+        conference = Conference(
+            start=datetime(2018, 3, 16),
+            end=datetime(2018, 3, 16),
+            days=1
+        )
+        populate_conference_days(conference)
+
+        # adding event outside conference period, should not happen
+        add_event2conference(conference, self.test_event2, [])
+        self.assertEquals(0, mock_add_event2day.call_count)
+
+
+        # add event to the existing conference day
+        add_event2conference(conference, self.test_event1, ["room3"])
+        mock_add_event2day.assert_called_once_with(
+            conference,
+            conference.day_objects[0],
+            self.test_event1,
+            ["room3"]
+        );
+
+    @mock.patch('schedule_parser.add_event2day')
+    def test_add_event2conference_2day(self, mock_add_event2day):
+        """ Test add_event2conference """
+        conference = Conference(
+            start=datetime(2018, 3, 15),
+            end=datetime(2018, 3, 16),
+            days=2
+        )
+        populate_conference_days(conference)
+
+        # adding event outside conference period, should not happen
+        add_event2conference(conference, self.test_event2, [])
+        self.assertEquals(0, mock_add_event2day.call_count)
+
+
+        # add event to the second conference day
+        add_event2conference(conference, self.test_event1, ["room1", "room2"])
+        mock_add_event2day.assert_called_once_with(
+            conference,
+            conference.day_objects[1],
+            self.test_event1,
+            ["room1", "room2"]
+        );
 
     def test_populate_conference_days_invalid_parameters(self):
         """ Test populate_conference_days """

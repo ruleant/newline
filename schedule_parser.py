@@ -168,6 +168,16 @@ def read_json(json_input_file, json_schema_file):
 
 def add_event2conference(conference, event, event_rooms):
     """ Add event to a conference """
+    # check parameter type
+    if not isinstance(conference, Conference):
+        raise TypeError("parameter conference should be a Conference instance")
+
+    if not isinstance(event, Event):
+        raise TypeError("parameter event should be an Event instance")
+
+    if not isinstance(event_rooms, list):
+        raise TypeError("parameter event_rooms should be a list")
+
     # look for to the correct conference day
     for conf_day in conference.day_objects:
         if event.date.strftime("%Y-%m-%d") \
